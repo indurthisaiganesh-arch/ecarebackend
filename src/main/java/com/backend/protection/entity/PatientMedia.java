@@ -41,7 +41,7 @@ public class PatientMedia {
     private Long fileSize;
 
     @Lob
-    @Column(name = "file_data", nullable = false, columnDefinition = "LONGTEXT")
+    @Column(name = "file_data", nullable = false, columnDefinition = "TEXT")
     private String fileData;
 
     @Column(name = "media_hash", length = 64, nullable = false)
