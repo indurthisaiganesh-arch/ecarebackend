@@ -1,27 +1,26 @@
 package com.backend.protection.service;
 
-import jakarta.mail.MessagingException;
-import jakarta.mail.internet.MimeMessage;
+import com.sendgrid.Method;
+import com.sendgrid.Request;
+import com.sendgrid.Response;
+import com.sendgrid.SendGrid;
+import com.sendgrid.helpers.mail.Mail;
+import com.sendgrid.helpers.mail.objects.Content;
+import com.sendgrid.helpers.mail.objects.Email;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
+
 /**
  * ─── EmailService ─────────────────────────────────────────────────────────────
- * Sends transactional HTML emails via Gmail SMTP (JavaMailSender).
+ * Sends transactional HTML emails via SendGrid HTTP API.
  *
  * All methods are @Async — email delivery never blocks the calling thread.
- * Configure SMTP credentials in application-dev.properties.
- *
- * Gmail setup note:
- *   If "Less secure app access" is disabled (default on modern accounts),
- *   generate a 16-char App Password at:
- *   https://myaccount.google.com/apppasswords
- *   and use that as spring.mail.password instead of the account password.
+ * Configure SendGrid API key in application.properties or Render Environment.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 @Service
@@ -29,7 +28,8 @@ public class EmailService {
 
     private static final Logger log = LoggerFactory.getLogger(EmailService.class);
 
-    private final JavaMailSender mailSender;
+    @Value("${GRID_API}")
+    private String sendGridApiKey;
 
     @Value("${app.email.from:admin.caredigital@gmail.com}")
     private String fromEmail;
@@ -40,14 +40,10 @@ public class EmailService {
     @Value("${app.email.enabled:true}")
     private boolean emailEnabled;
 
-    public EmailService(JavaMailSender mailSender) {
-        this.mailSender = mailSender;
-    }
-
     // ── Core Send ─────────────────────────────────────────────────────────────
 
     /**
-     * Sends an HTML email asynchronously.
+     * Sends an HTML email asynchronously via SendGrid HTTP API.
      *
      * @param to       Recipient email address
      * @param subject  Email subject line
@@ -60,18 +56,32 @@ public class EmailService {
             return;
         }
         try {
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-            helper.setFrom(fromEmail, fromName);
-            helper.setTo(to);
-            helper.setSubject(subject);
-            helper.setText(htmlBody, true); // true = isHtml
-            mailSender.send(message);
-            log.info("[EMAIL SENT] '{}' → {}", subject, to);
-        } catch (MessagingException | java.io.UnsupportedEncodingException e) {
+            Email from = new Email(fromEmail, fromName);
+            Email recipient = new Email(to);
+            
+            // Explicitly set to text/html to render your templates correctly
+            Content content = new Content("text/html", htmlBody); 
+            Mail mail = new Mail(from, subject, recipient, content);
+
+            SendGrid sg = new SendGrid(sendGridApiKey);
+            Request request = new Request();
+            request.setMethod(Method.POST);
+            request.setEndpoint("mail/send");
+            request.setBody(mail.build());
+
+            Response response = sg.api(request);
+
+            if (response.getStatusCode() >= 400) {
+                log.error("[EMAIL ERROR] SendGrid rejected '{}' to {}: {}", subject, to, response.getBody());
+            } else {
+                log.info("[EMAIL SENT] '{}' → {}", subject, to);
+            }
+        } catch (IOException e) {
             log.error("[EMAIL ERROR] Failed to send '{}' to {}: {}", subject, to, e.getMessage());
         }
     }
+
+
 
     // ── OTP Email ─────────────────────────────────────────────────────────────
 
