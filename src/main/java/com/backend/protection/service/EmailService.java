@@ -28,7 +28,7 @@ public class EmailService {
 
     private static final Logger log = LoggerFactory.getLogger(EmailService.class);
 
-    @Value("${GRID_API}")
+    @Value("${sendgrid.api.key}")
     private String sendGridApiKey;
 
     @Value("${app.email.from:admin.caredigital@gmail.com}")
