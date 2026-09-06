@@ -60,7 +60,7 @@ public class HealthController {
             dbInfo.put("catalog", connection.getCatalog());
 
             try (Statement statement = connection.createStatement();
-                 ResultSet rs = statement.executeQuery("SELECT COUNT(*) AS tableCount FROM information_schema.tables WHERE table_schema = current_schema()")) {
+                 ResultSet rs = statement.executeQuery("SELECT COUNT(*) AS tableCount FROM information_schema.tables WHERE table_schema = 'public' ")) {
                 if (rs.next()) {
                     dbInfo.put("tablesConfigured", rs.getInt("tableCount"));
                 }
